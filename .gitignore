@@ -1,0 +1,6 @@
+# webs
+package-lock.json
+
+#typescript
+node_modules
+dist
