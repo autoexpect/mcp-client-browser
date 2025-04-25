@@ -1,8 +1,8 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
 import BuildSystemPrompt from "../utils/prompt.js";
-import { MCPTool, MessageContent } from "../types/mcp-sseclient.js";
-import { SSEConnection } from "../types/mcp-sseclient.js";
+import { MCPTool, MessageContent } from "../types/mcp-sseclient";
+import { SSEConnection } from "../types/mcp-sseclient";
 import OpenAI from 'openai';
 
 class MCPClient {
@@ -18,6 +18,7 @@ class MCPClient {
         openAIApiModel: string = "",
         userSystemPrompt: string = ""
     ) {
+        // Convert single URL or URL array to connections array
         const urlArray = Array.isArray(sseUrls) ? sseUrls : [sseUrls];
 
         // Initialize each connection
@@ -27,7 +28,7 @@ class MCPClient {
                 name: `sse-client-${index}`,
                 version: '1.0.0'
             }),
-            name: url.hostname // Use hostname as the default name
+            name: url.hostname // Use hostname as default name
         }));
 
         this.chatHistory = []; // Initialize empty chat history
@@ -35,7 +36,7 @@ class MCPClient {
         // Store user system prompt
         this.userSystemPrompt = userSystemPrompt;
 
-        // If OpenAI API key is provided, initialize OpenAI client
+        // Initialize OpenAI client if API key is provided
         if (openAIBaseUrl && openAIApiKey) {
             this.openAI = new OpenAI({
                 apiKey: openAIApiKey,
@@ -53,7 +54,6 @@ class MCPClient {
         const connectionPromises = this.sseConnections.map(async (conn) => {
             try {
                 await conn.client.connect(new SSEClientTransport(conn.url));
-                console.log(`Connected to SSE service at ${conn.url}`);
                 return true;
             } catch (error) {
                 console.error(`Failed to connect to SSE service at ${conn.url}:`, error);
@@ -74,13 +74,13 @@ class MCPClient {
 
     /**
      * List all tools from connected services
-     * @returns Merged list of tools, each with a source identifier
+     * @returns Merged list of tools, each with source service identification
      */
     async listTools() {
         const toolsPromises = this.sseConnections.map(async (conn) => {
             try {
                 const response = await conn.client.listTools();
-                // Add source identifier to each tool
+                // Add source identification for each tool
                 const tools = response.tools.map((tool: any) => ({
                     ...tool,
                     serviceSource: conn.name || conn.url.toString()
@@ -102,14 +102,14 @@ class MCPClient {
     }
 
     /**
-     * Clear chat history and start a new conversation
+     * Clear chat history to start a new conversation
      */
     clearChatHistory(): void {
         this.chatHistory = [];
     }
 
     /**
-     * Get the current chat history
+     * Get current chat history
      */
     getChatHistory(): MessageContent[] {
         return [...this.chatHistory]; // Return a copy to prevent external modification
@@ -117,25 +117,25 @@ class MCPClient {
 
     /**
      * Process user query and interact with LLM
-     * @param query The user's current query
-     * @param useHistory Whether to use and update chat history, default is true
-     * @returns The response from the large language model
+     * @param query User's current query
+     * @param useHistory Whether to use and update chat history, defaults to true
+     * @returns Response from the language model
      */
     async processQuery(query: string, useHistory: boolean = true): Promise<string> {
         if (!this.openAI) {
             throw new Error("OpenAI API key not provided. Cannot process query.");
         }
 
-        // Get the list of tools from all services
+        // Get tool list from all services
         const response = await this.listTools();
 
-        // Build system prompt including tools from all services
+        // Build system prompt with tools from all services
         const systemPrompt = BuildSystemPrompt(this.userSystemPrompt, response.tools as unknown as MCPTool[]);
 
         let messages: MessageContent[];
 
         if (!useHistory || this.chatHistory.length === 0) {
-            // Create a new session if not using history or history is empty
+            // Create new session if not using history or history is empty
             messages = [
                 { role: "system", content: systemPrompt },
                 { role: "user", content: query }
@@ -144,23 +144,23 @@ class MCPClient {
             // Use existing history
             messages = [...this.chatHistory];
 
-            // Update system prompt (if the first message is a system prompt)
+            // Update system prompt (if first message is system prompt)
             if (messages.length > 0 && messages[0].role === "system") {
                 messages[0].content = systemPrompt;
             } else {
-                // Add a system prompt if none exists
+                // Add system prompt if not present
                 messages.unshift({ role: "system", content: systemPrompt });
             }
 
-            // Add the user's new query
+            // Add user's new query
             messages.push({ role: "user", content: query });
         }
 
         while (true) {
-            console.log(`[Calling LLM with query ${JSON.stringify({
-                model: this.openAI.apiModel,
-                messages: messages
-            })}]\n\n`);
+            // console.log(`[Calling LLM with query ${JSON.stringify({
+            //     model: this.openAI.apiModel,
+            //     messages: messages
+            // })}]\n\n`);
 
             const completion = await this.openAI.chat.completions.create({
                 model: this.openAI.apiModel,
@@ -169,7 +169,7 @@ class MCPClient {
 
             const assistantMessage = completion.choices[0].message.content || '';
 
-            console.log(`[LLM response: ${assistantMessage}]\n\n`);
+            // console.log(`[LLM response: ${assistantMessage}]\n\n`);
 
             // Parse tool calls
             const toolUseList = this.extractToolUses(assistantMessage);
@@ -183,14 +183,14 @@ class MCPClient {
             // If no tool calls, update history and return result
             if (!toolUseList || toolUseList.length === 0) {
                 if (useHistory) {
-                    this.chatHistory = messages; // Update instance's chat history
+                    this.chatHistory = messages; // Update instance chat history
                 }
                 return assistantMessage;
             }
 
-            console.log(`[Found ${toolUseList.length} tool uses]\n\n`);
+            // console.log(`[Found ${toolUseList.length} tool uses]\n\n`);
 
-            // Handle each tool call
+            // Process each tool call
             for (const toolUse of toolUseList) {
                 const toolName = toolUse.name;
                 const toolArgs = toolUse.arguments;
@@ -199,17 +199,17 @@ class MCPClient {
                     continue;
                 }
 
-                console.log(`[Calling tool ${toolName} with args ${JSON.stringify(toolArgs)}]\n\n`);
+                // console.log(`[Calling tool ${toolName} with args ${JSON.stringify(toolArgs)}]\n\n`);
 
                 try {
-                    // Find the client providing this tool
+                    // Find client that provides this tool
                     const clientForTool = await this.findClientForTool(toolName);
 
                     if (!clientForTool) {
                         throw new Error(`No service provides tool: ${toolName}`);
                     }
 
-                    // Execute the tool call
+                    // Execute tool call
                     const result = await clientForTool.callTool({
                         name: toolName,
                         arguments: toolArgs
@@ -232,8 +232,7 @@ class MCPClient {
                     });
                 } catch (error) {
                     // Log error and add error message to messages
-                    const errorMessage = `Error calling tool ${toolName}: ${error}`;
-                    console.log(`[${errorMessage}]\n\n`);
+                    console.log(`[Error calling tool ${toolName}: ${error}]\n\n`);
 
                     messages.push({
                         role: "user",
@@ -245,9 +244,167 @@ class MCPClient {
     }
 
     /**
-     * Find the client providing a specific tool
-     * @param toolName The name of the tool
-     * @returns The client providing the tool, or null if not found
+     * Process user query and interact with LLM in streaming mode
+     * @param query User's current query
+     * @param useHistory Whether to use and update chat history, defaults to true
+     * @param onChunk Callback function to receive each text chunk
+     * @returns Complete response from the language model
+    */
+    async processQueryStream(
+        query: string,
+        useHistory: boolean = true,
+        onChunk: (chunk: string) => void
+    ): Promise<string> {
+        if (!this.openAI) {
+            throw new Error("OpenAI API key not provided. Cannot process query.");
+        }
+
+        // Get tool list from all services
+        const response = await this.listTools();
+
+        // Build system prompt with tools from all services
+        const systemPrompt = BuildSystemPrompt(this.userSystemPrompt, response.tools as unknown as MCPTool[]);
+
+        let messages: MessageContent[];
+
+        if (!useHistory || this.chatHistory.length === 0) {
+            // Create new session if not using history or history is empty
+            messages = [
+                { role: "system", content: systemPrompt },
+                { role: "user", content: query }
+            ];
+        } else {
+            // Use existing history
+            messages = [...this.chatHistory];
+
+            // Update system prompt (if first message is system prompt)
+            if (messages.length > 0 && messages[0].role === "system") {
+                messages[0].content = systemPrompt;
+            } else {
+                // Add system prompt if not present
+                messages.unshift({ role: "system", content: systemPrompt });
+            }
+
+            // Add user's new query
+            messages.push({ role: "user", content: query });
+        }
+
+        let fullResponse = '';
+        let currentAssistantMessage = '';
+
+        while (true) {
+            // console.log(`[Calling LLM with query ${JSON.stringify({
+            //     model: this.openAI.apiModel,
+            //     messages: messages,
+            //     stream: true
+            // })}]\n\n`);
+
+            // Use OpenAI SDK's streaming API
+            currentAssistantMessage = '';
+            const stream = await this.openAI.chat.completions.create({
+                model: this.openAI.apiModel,
+                messages: messages as any,
+                stream: true
+            });
+
+            for await (const chunk of stream) {
+                const content = chunk.choices[0]?.delta?.content || '';
+                if (content) {
+                    currentAssistantMessage += content;
+                    onChunk(content); // Pass each chunk to callback
+                }
+            }
+
+            // console.log(`[LLM stream response completed: ${currentAssistantMessage}]\n\n`);
+
+            // Add assistant's response to message history
+            messages.push({
+                role: "assistant",
+                content: currentAssistantMessage
+            });
+
+            // Parse tool calls
+            const toolUseList = this.extractToolUses(currentAssistantMessage);
+
+            // If no tool calls, update history and return result
+            if (!toolUseList || toolUseList.length === 0) {
+                if (useHistory) {
+                    this.chatHistory = messages; // Update instance chat history
+                }
+                fullResponse = currentAssistantMessage;
+                return fullResponse;
+            }
+
+            // console.log(`[Found ${toolUseList.length} tool uses]\n\n`);
+
+            // Process each tool call
+            for (const toolUse of toolUseList) {
+                const toolName = toolUse.name;
+                const toolArgs = toolUse.arguments;
+
+                if (!toolName) {
+                    continue;
+                }
+
+                // console.log(`[Calling tool ${toolName} with args ${JSON.stringify(toolArgs)}]\n\n`);
+
+                try {
+                    // Find client that provides this tool
+                    const clientForTool = await this.findClientForTool(toolName);
+
+                    if (!clientForTool) {
+                        throw new Error(`No service provides tool: ${toolName}`);
+                    }
+
+                    // Execute tool call
+                    const result = await clientForTool.callTool({
+                        name: toolName,
+                        arguments: toolArgs
+                    });
+
+                    // Add tool result to messages
+                    messages.push({
+                        role: "user",
+                        content: [
+                            {
+                                type: "text",
+                                text: "Here is the result of tool call: " + toolName
+                            },
+                            {
+                                type: "text",
+                                text: JSON.stringify(result.content && Array.isArray(result.content) ?
+                                    result.content[0]?.text : result)
+                            }
+                        ]
+                    });
+
+                    // Notify user that tool call is completed
+                    const toolCallInfo = `\n[Tool ${toolName} executed successfully]`;
+                    onChunk(toolCallInfo);
+                    fullResponse += toolCallInfo;
+
+                } catch (error) {
+                    // Log error and add error message to messages
+                    console.log(`[Error calling tool ${toolName}: ${error}]\n\n`);
+
+                    messages.push({
+                        role: "user",
+                        content: `The tool call to ${toolName} failed with error: ${error}`
+                    });
+
+                    // Notify user of tool call failure
+                    const errorInfo = `\n[Tool ${toolName} failed: ${error}]`;
+                    onChunk(errorInfo);
+                    fullResponse += errorInfo;
+                }
+            }
+        }
+    }
+
+    /**
+     * Find a client that provides the specified tool
+     * @param toolName Tool name
+     * @returns Client that provides the tool, or null if not found
      */
     private async findClientForTool(toolName: string): Promise<Client | null> {
         for (const conn of this.sseConnections) {
@@ -270,9 +427,9 @@ class MCPClient {
     extractToolUses(text: string): Array<{ name: string, arguments: any }> {
         const toolUses: Array<{ name: string, arguments: any }> = [];
 
-        // Regular expression to match different formats of tool calls
+        // Regular expressions to match different tool call formats
 
-        // Handle format 1: Standard single-line tool call
+        // Format 1: Standard single-line tool calls
         const pattern1 = /<tool_use>\s*<name>(.*?)<\/name>\s*<arguments>(.*?)<\/arguments>\s*<\/tool_use>/gs;
         let matches = [...text.matchAll(pattern1)];
 
@@ -282,7 +439,7 @@ class MCPClient {
             matches = [...text.matchAll(pattern2)];
         }
 
-        // Handle format 3: More relaxed pattern
+        // Format 3: More lenient pattern
         if (matches.length === 0) {
             const namePattern = /<name>(.*?)<\/name>/gs;
             const argsPattern = /<arguments>(.*?)<\/arguments>/gs;
