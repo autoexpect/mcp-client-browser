@@ -6,54 +6,81 @@ import { SSEConnection } from "../types/mcp-sseclient";
 import OpenAI from 'openai';
 
 class MCPClient {
-    private sseConnections: SSEConnection[] = [];
     private openAI: any;
-    private chatHistory: MessageContent[] = [];
+
     private userSystemPrompt: string = "";
 
-    constructor(
-        sseUrls: URL | URL[],
-        openAIBaseUrl: string = "",
-        openAIApiKey: string = "",
-        openAIApiModel: string = "",
-        userSystemPrompt: string = ""
-    ) {
-        // Convert single URL or URL array to connections array
-        const urlArray = Array.isArray(sseUrls) ? sseUrls : [sseUrls];
+    private chatHistory: MessageContent[] = [];
+    private mcpConnections: SSEConnection[] = [];
 
-        // Initialize each connection
-        this.sseConnections = urlArray.map((url, index) => ({
-            url,
-            client: new Client({
-                name: `sse-client-${index}`,
-                version: '1.0.0'
-            }),
-            name: url.hostname // Use hostname as default name
-        }));
+    constructor(
+        // Accept an object or array of objects with URL and custom headers
+        mcpUrls: (URL | { url: URL, headers?: Record<string, string>, name?: string }) | (URL | { url: URL, headers?: Record<string, string>, name?: string })[],
+        openAIConfig?: {
+            baseUrl?: string,
+            apiKey?: string,
+            model?: string,
+            systemPrompt?: string
+        }
+    ) {
+        // Handle single URL/config object or array
+        const urlConfigArray = Array.isArray(mcpUrls) ? mcpUrls : [mcpUrls];
+
+        // Convert different input formats to unified connection configuration array
+        this.mcpConnections = urlConfigArray.map((item, index) => {
+            if (item instanceof URL) {
+                // If it's a direct URL object
+                return {
+                    url: item,
+                    client: new Client({
+                        name: `sse-client-${index}`,
+                        version: '1.0.0'
+                    }),
+                    name: item.hostname // Use hostname as default name
+                };
+            } else {
+                // If it's a configuration object
+                return {
+                    url: item.url,
+                    headers: item.headers || {}, // Store custom headers
+                    client: new Client({
+                        name: `sse-client-${index}`,
+                        version: '1.0.0'
+                    }),
+                    name: item.name || item.url.hostname // Use provided name or default to hostname
+                };
+            }
+        });
 
         this.chatHistory = []; // Initialize empty chat history
 
         // Store user system prompt
-        this.userSystemPrompt = userSystemPrompt;
+        this.userSystemPrompt = openAIConfig?.systemPrompt || "";
 
         // Initialize OpenAI client if API key is provided
-        if (openAIBaseUrl && openAIApiKey) {
+        if (openAIConfig?.baseUrl && openAIConfig?.apiKey) {
             this.openAI = new OpenAI({
-                apiKey: openAIApiKey,
-                baseURL: openAIBaseUrl,
+                apiKey: openAIConfig.apiKey,
+                baseURL: openAIConfig.baseUrl,
                 dangerouslyAllowBrowser: true
             });
-            this.openAI.apiModel = openAIApiModel;
+            this.openAI.apiModel = openAIConfig.model || "gpt-3.5-turbo";
         }
     }
-
     /**
      * Connect to all configured SSE services
+     * @returns Results of connection attempts
      */
     async connect() {
-        const connectionPromises = this.sseConnections.map(async (conn) => {
+        const connectionPromises = this.mcpConnections.map(async (conn) => {
             try {
-                await conn.client.connect(new SSEClientTransport(conn.url));
+                // Create SSEClientTransport instance with custom HTTP headers
+                const transport = new SSEClientTransport(conn.url, {
+                    requestInit: {
+                        headers: conn.headers || {}
+                    }
+                });
+                await conn.client.connect(transport);
                 return true;
             } catch (error) {
                 console.error(`Failed to connect to SSE service at ${conn.url}:`, error);
@@ -64,7 +91,7 @@ class MCPClient {
         // Wait for all connections to complete
         const results = await Promise.all(connectionPromises);
 
-        // Check if at least one connection was successful
+        // Check if at least one connection succeeded
         if (!results.some(result => result)) {
             throw new Error("Failed to connect to any SSE service");
         }
@@ -77,7 +104,7 @@ class MCPClient {
      * @returns Merged list of tools, each with source service identification
      */
     async listTools() {
-        const toolsPromises = this.sseConnections.map(async (conn) => {
+        const toolsPromises = this.mcpConnections.map(async (conn) => {
             try {
                 const response = await conn.client.listTools();
                 // Add source identification for each tool
@@ -363,7 +390,7 @@ class MCPClient {
                     });
 
                     // Add tool result to messages
-                    messages.push({
+                    const resultMessage: MessageContent = {
                         role: "user",
                         content: [
                             {
@@ -376,12 +403,13 @@ class MCPClient {
                                     result.content[0]?.text : result)
                             }
                         ]
-                    });
+                    };
+                    messages.push(resultMessage);
 
                     // Notify user that tool call is completed
-                    const toolCallInfo = `\n[Tool ${toolName} executed successfully]`;
+                    const toolCallInfo = "\n\n```json\n" + JSON.stringify(resultMessage) + "\n```\n\n";
                     onChunk(toolCallInfo);
-                    fullResponse += toolCallInfo;
+                    // fullResponse += toolCallInfo;
 
                 } catch (error) {
                     // Log error and add error message to messages
@@ -407,7 +435,7 @@ class MCPClient {
      * @returns Client that provides the tool, or null if not found
      */
     private async findClientForTool(toolName: string): Promise<Client | null> {
-        for (const conn of this.sseConnections) {
+        for (const conn of this.mcpConnections) {
             try {
                 const response = await conn.client.listTools();
                 const hasTool = response.tools.some((tool: any) => tool.name === toolName);

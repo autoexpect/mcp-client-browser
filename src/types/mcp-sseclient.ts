@@ -26,4 +26,5 @@ export interface SSEConnection {
     url: URL;
     client: Client;
     name?: string;
+    headers?: Record<string, string>;
 }
