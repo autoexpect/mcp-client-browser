@@ -15,17 +15,38 @@
 
 ### Installation
 
-Coming soon!
+```bash
+npm i @autoexpect/mcp-sseclient-browser
+```
 
 ### Usage
 
-Coming soon!
+```javascript
+let mcpClient = new MCPClient(
+  [
+    {
+      url: new URL('/api/mcps/sse', window.location.origin)
+    }
+  ],
+  {
+    baseUrl: window.location.origin + "/v1",
+    apiKey: "sk-default",
+    model: "deepseek-v3",
+  }
+);
+await mcpClient.connect();
+await mcpClient.processQueryStream(
+  "System Prompt",
+  "User Prompt",
+  true,
+  (chunk) => {
+  },
+  (fullResponse) => {
+  }
+);
+```
 
 > ✅ Make sure your MCP server supports CORS and the Cherry prompt specification.
-
-## 📘 Documentation
-
-Coming soon!
 
 ## 💡 Use Cases
 

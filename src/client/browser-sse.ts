@@ -8,8 +8,6 @@ import OpenAI from 'openai';
 class MCPClient {
     private openAI: any;
 
-    private userSystemPrompt: string = "";
-
     private chatHistory: MessageContent[] = [];
     private mcpConnections: SSEConnection[] = [];
 
@@ -20,7 +18,6 @@ class MCPClient {
             baseUrl?: string,
             apiKey?: string,
             model?: string,
-            systemPrompt?: string
         }
     ) {
         // Handle single URL/config object or array
@@ -54,8 +51,7 @@ class MCPClient {
 
         this.chatHistory = []; // Initialize empty chat history
 
-        // Store user system prompt
-        this.userSystemPrompt = openAIConfig?.systemPrompt || "";
+
 
         // Initialize OpenAI client if API key is provided
         if (openAIConfig?.baseUrl && openAIConfig?.apiKey) {
@@ -148,16 +144,23 @@ class MCPClient {
      * @param useHistory Whether to use and update chat history, defaults to true
      * @returns Response from the language model
      */
-    async processQuery(query: string, useHistory: boolean = true): Promise<string> {
+    async processQuery(
+        userSystemPrompt: string,
+        query: string,
+        useHistory: boolean = true
+    ): Promise<string> {
         if (!this.openAI) {
             throw new Error("OpenAI API key not provided. Cannot process query.");
         }
+
+        // User system prompt
+        userSystemPrompt = userSystemPrompt || "";
 
         // Get tool list from all services
         const response = await this.listTools();
 
         // Build system prompt with tools from all services
-        const systemPrompt = BuildSystemPrompt(this.userSystemPrompt, response.tools as unknown as MCPTool[]);
+        const systemPrompt = BuildSystemPrompt(userSystemPrompt, response.tools as unknown as MCPTool[]);
 
         let messages: MessageContent[];
 
@@ -278,6 +281,7 @@ class MCPClient {
      * @returns Complete response from the language model
     */
     async processQueryStream(
+        userSystemPrompt: string,
         query: string,
         useHistory: boolean = true,
         onChunk: (chunk: string) => void
@@ -286,11 +290,14 @@ class MCPClient {
             throw new Error("OpenAI API key not provided. Cannot process query.");
         }
 
+        // User system prompt
+        userSystemPrompt = userSystemPrompt || "";
+
         // Get tool list from all services
         const response = await this.listTools();
 
         // Build system prompt with tools from all services
-        const systemPrompt = BuildSystemPrompt(this.userSystemPrompt, response.tools as unknown as MCPTool[]);
+        const systemPrompt = BuildSystemPrompt(userSystemPrompt, response.tools as unknown as MCPTool[]);
 
         let messages: MessageContent[];
 
