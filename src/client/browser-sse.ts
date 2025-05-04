@@ -299,6 +299,8 @@ class MCPClient {
         // Build system prompt with tools from all services
         const systemPrompt = BuildSystemPrompt(userSystemPrompt, response.tools as unknown as MCPTool[]);
 
+        // console.log(`[System prompt: ${systemPrompt}]\n\n`);
+
         let messages: MessageContent[];
 
         if (!useHistory || this.chatHistory.length === 0) {
@@ -521,8 +523,27 @@ class MCPClient {
      * Clean up all resources
      */
     async cleanup(): Promise<void> {
+        const disconnectionPromises = this.mcpConnections.map(async (conn) => {
+            try {
+                if (conn.client) {
+                    await conn.client.close();
+                }
+                return true;
+            } catch (error) {
+                console.error(`Error disconnecting from ${conn.name || conn.url.toString()}:`, error);
+                return false;
+            }
+        });
 
+        await Promise.all(disconnectionPromises);
+
+        this.chatHistory = [];
+
+        if (this.openAI) {
+            this.openAI = null;
+        }
     }
+
 }
 
 export { MCPClient };
