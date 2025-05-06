@@ -11,7 +11,8 @@
   },
   "scripts": {
     "build": "npx tsc",
-    "test": "echo \"No tests specified\" && exit 0"
+    "test": "echo \"No tests specified\" && exit 0",
+    "postinstall": "patch-package"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.10.2",
@@ -19,6 +20,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.14.1",
+    "patch-package": "^8.0.0",
     "typescript": "^4.0.0"
   },
   "browserslist": [
@@ -27,5 +29,8 @@
   ],
   "files": [
     "dist"
-  ]
+  ],
+  "engines": {
+    "node": ">=22.0.0"
+  }
 }
