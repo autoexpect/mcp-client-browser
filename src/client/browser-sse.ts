@@ -51,8 +51,6 @@ class MCPClient {
 
         this.chatHistory = []; // Initialize empty chat history
 
-
-
         // Initialize OpenAI client if API key is provided
         if (openAIConfig?.baseUrl && openAIConfig?.apiKey) {
             this.openAI = new OpenAI({
@@ -203,7 +201,8 @@ class MCPClient {
                 messages: messages as any,
                 max_tokens: maxTokens,
                 top_p: topP,
-                temperature: temperature
+                temperature: temperature,
+                tools: [],
             });
 
             const assistantMessage = completion.choices[0].message.content || '';
@@ -358,7 +357,8 @@ class MCPClient {
                 stream: true,
                 max_tokens: maxTokens,
                 top_p: topP,
-                temperature: temperature
+                temperature: temperature,
+                tools: [],
             });
 
             for await (const chunk of stream) {
