@@ -256,7 +256,7 @@ class MCPClient {
                             {
                                 type: "text",
                                 text: JSON.stringify(result.content && Array.isArray(result.content) ?
-                                    result.content[0]?.text : result)
+                                    result.content[0]?.text : result) + "\n\n"
                             }
                         ]
                     });
