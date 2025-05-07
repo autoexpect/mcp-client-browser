@@ -142,12 +142,18 @@ class MCPClient {
      * Process user query and interact with LLM
      * @param query User's current query
      * @param useHistory Whether to use and update chat history, defaults to true
+     * @param maxTokens Maximum number of tokens to generate in the completion
+     * @param topP Nucleus sampling parameter (0.0 to 1.0)
+     * @param temperature Sampling temperature (0.0 to 2.0)
      * @returns Response from the language model
      */
     async processQuery(
         userSystemPrompt: string,
         query: string,
-        useHistory: boolean = true
+        useHistory: boolean = true,
+        maxTokens?: number,
+        topP?: number,
+        temperature?: number
     ): Promise<string> {
         if (!this.openAI) {
             throw new Error("OpenAI API key not provided. Cannot process query.");
@@ -194,7 +200,10 @@ class MCPClient {
 
             const completion = await this.openAI.chat.completions.create({
                 model: this.openAI.apiModel,
-                messages: messages as any
+                messages: messages as any,
+                max_tokens: maxTokens,
+                top_p: topP,
+                temperature: temperature
             });
 
             const assistantMessage = completion.choices[0].message.content || '';
@@ -278,13 +287,19 @@ class MCPClient {
      * @param query User's current query
      * @param useHistory Whether to use and update chat history, defaults to true
      * @param onChunk Callback function to receive each text chunk
+     * @param maxTokens Maximum number of tokens to generate in the completion
+     * @param topP Nucleus sampling parameter (0.0 to 1.0)
+     * @param temperature Sampling temperature (0.0 to 2.0)
      * @returns Complete response from the language model
     */
     async processQueryStream(
         userSystemPrompt: string,
         query: string,
         useHistory: boolean = true,
-        onChunk: (chunk: string) => void
+        onChunk: (chunk: string) => void,
+        maxTokens?: number,
+        topP?: number,
+        temperature?: number
     ): Promise<string> {
         if (!this.openAI) {
             throw new Error("OpenAI API key not provided. Cannot process query.");
@@ -340,7 +355,10 @@ class MCPClient {
             const stream = await this.openAI.chat.completions.create({
                 model: this.openAI.apiModel,
                 messages: messages as any,
-                stream: true
+                stream: true,
+                max_tokens: maxTokens,
+                top_p: topP,
+                temperature: temperature
             });
 
             for await (const chunk of stream) {
