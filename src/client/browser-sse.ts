@@ -430,7 +430,10 @@ class MCPClient {
                     });
 
                     // Notify user of tool call failure
-                    const errorInfo = `\n[Tool ${toolName} failed: ${error}]`;
+                    const errorInfo = "\n\n```json\n" + JSON.stringify({
+                        role: "user",
+                        content: `The tool call to ${toolName} failed with error: ${error}`
+                    }) + "\n```\n\n";
                     onChunk(errorInfo);
                     fullResponse += errorInfo;
                 }
