@@ -205,18 +205,20 @@ class MCPClient {
                 tools: [],
             });
 
-            const assistantMessage = completion.choices[0].message.content || '';
+            let assistantMessage = completion.choices[0].message.content || '';
+
+            assistantMessage = assistantMessage.replace(/<think>[\s\S]*?<\/think>/g, '');
 
             // console.log(`[LLM response: ${assistantMessage}]\n\n`);
-
-            // Parse tool calls
-            const toolUseList = this.extractToolUses(assistantMessage);
 
             // Add assistant's response to message history
             messages.push({
                 role: "assistant",
                 content: assistantMessage
             });
+
+            // Parse tool calls
+            const toolUseList = this.extractToolUses(assistantMessage);
 
             // If no tool calls, update history and return result
             if (!toolUseList || toolUseList.length === 0) {
@@ -361,13 +363,31 @@ class MCPClient {
                 tools: [],
             });
 
+            let reasoning_content_first_find = false;
+            let reasoning_content_last_find = false;
             for await (const chunk of stream) {
                 const content = chunk.choices[0]?.delta?.content || '';
+                const reasoning_content = chunk.choices[0]?.delta?.reasoning_content;
                 if (content) {
                     currentAssistantMessage += content;
                     onChunk(content); // Pass each chunk to callback
                 }
+
+                // reasoning_content
+                if (reasoning_content) {
+                    if (!reasoning_content_first_find) {
+                        reasoning_content_first_find = true;
+                        onChunk("<think>" + reasoning_content);
+                    } else {
+                        onChunk(reasoning_content);
+                    }
+                } else if (reasoning_content_first_find && !reasoning_content_last_find && content) {
+                    reasoning_content_last_find = true;
+                    onChunk("</think>");
+                }
             }
+
+            currentAssistantMessage = currentAssistantMessage.replace(/<think>[\s\S]*?<\/think>/g, '');
 
             // console.log(`[LLM stream response completed: ${currentAssistantMessage}]\n\n`);
 
