@@ -52,9 +52,9 @@ class MCPClient {
         this.chatHistory = []; // Initialize empty chat history
 
         // Initialize OpenAI client if API key is provided
-        if (openAIConfig?.baseUrl && openAIConfig?.apiKey) {
+        if (openAIConfig?.baseUrl && (openAIConfig?.apiKey !== undefined)) {
             this.openAI = new OpenAI({
-                apiKey: openAIConfig.apiKey,
+                apiKey: openAIConfig.apiKey || '',  // 允许空字符串
                 baseURL: openAIConfig.baseUrl,
                 dangerouslyAllowBrowser: true
             });
